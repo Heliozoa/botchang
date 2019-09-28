@@ -1,0 +1,10 @@
+[package]
+name = "botchang"
+version = "0.1.0"
+authors = ["sasami-san"]
+edition = "2018"
+
+[dependencies]
+twitchchat = "0.7.2"
+regex = "1.3.1"
+lazy_static = "1.4.0"
