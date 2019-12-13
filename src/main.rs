@@ -13,7 +13,7 @@ const OAUTH_TOKEN_VAR: &str = "OAUTH_TOKEN";
 const CHANNEL_NAME_VAR: &str = "CHANNEL_NAME";
 
 lazy_static! {
-    static ref RE: Regex = Regex::new(r"^!(\S+) ?(.*)").unwrap();
+    static ref RE: Regex = Regex::new(r"^!(\S+)(?: (.+))?").unwrap();
 }
 
 fn main() {
