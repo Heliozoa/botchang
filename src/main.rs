@@ -64,24 +64,28 @@ struct BotChang {
 
 impl BotChang {
     fn handle(&self, msg: commands::PrivMsg) {
-        let _user = msg.user();
+        let user = msg.user();
         let message = msg.message();
         let cap = RE.captures(message);
         if let Some(cap) = cap {
             let cmd = &cap[1];
-            let args = &cap[2].split(" ").collect::<Vec<_>>();
-            match cmd {
-                "bap" => {
-                    self.bap();
+            let args = &cap
+                .get(2)
+                .map(|args| args.as_str().split(" ").collect::<Vec<_>>())
+                .unwrap_or(vec![]);
+            match (cmd, args.as_slice()) {
+                ("bap", []) => {
+                    self.bap(user);
                 }
                 _ => (),
             }
         }
     }
 
-    fn bap(&self) {
-        self.writer.send(&self.channel, "SachikoPresent").unwrap();
-        std::thread::sleep(std::time::Duration::from_secs(4));
-        self.writer.send(&self.channel, "SachikoBap").unwrap();
+    fn bap(&self, bapper: &str) {
+        let msg = format!("SachikoPresent Thank you, {}!", bapper);
+        self.writer.send(&self.channel, msg).unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        self.writer.send(&self.channel, "SachikoBap BAP").unwrap();
     }
 }
