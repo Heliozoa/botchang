@@ -74,18 +74,24 @@ impl BotChang {
                 .map(|args| args.as_str().split(" ").collect::<Vec<_>>())
                 .unwrap_or(vec![]);
             match (cmd, args.as_slice()) {
-                ("bap", []) => {
-                    self.bap(user);
-                }
-                _ => (),
+                (_, _) => self.command(&cmd, &args),
             }
+        } else {
+            self.echo(&user, &message);
         }
     }
 
-    fn bap(&self, bapper: &str) {
-        let msg = format!("SachikoPresent Thank you, {}!", bapper);
+    fn command(&self, cmd: &str, args: &[&str]) {
+        let msg = format!("command {} with {:?}", cmd, args);
+        self.send(&msg);
+    }
+
+    fn echo(&self, user: &str, msg: &str) {
+        let msg = format!("echo {}: {}", user, msg);
+        self.send(&msg);
+    }
+
+    fn send(&self, msg: &str) {
         self.writer.send(&self.channel, msg).unwrap();
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        self.writer.send(&self.channel, "SachikoBap BAP").unwrap();
     }
 }
