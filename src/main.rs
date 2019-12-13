@@ -73,6 +73,7 @@ impl BotChang {
                 .get(2)
                 .map(|args| args.as_str().split(" ").collect::<Vec<_>>())
                 .unwrap_or(vec![]);
+
             match (cmd, args.as_slice()) {
                 (_, _) => self.command(&cmd, &args),
             }
