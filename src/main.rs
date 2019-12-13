@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 
+use dotenv::dotenv;
 use regex::Regex;
 use std::collections::HashMap;
 use std::env;
@@ -16,6 +17,8 @@ lazy_static! {
 }
 
 fn main() {
+    dotenv().ok();
+
     let vars = env::vars().collect::<HashMap<String, String>>();
     let bot_username = vars
         .get(BOT_USERNAME_VAR)
