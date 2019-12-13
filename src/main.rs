@@ -69,6 +69,7 @@ impl BotChang {
         let cap = RE.captures(message);
         if let Some(cap) = cap {
             let cmd = &cap[1];
+            let args = &cap[2].split(" ").collect::<Vec<_>>();
             match cmd {
                 "bap" => {
                     self.bap();
