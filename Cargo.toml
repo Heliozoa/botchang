@@ -1,14 +1,13 @@
 [package]
 name = "botchang"
 version = "0.1.0"
-authors = ["sasami-san"]
+authors = ["Heliozoa <daniel.x.martinez@helsinki.fi>"]
 edition = "2018"
 
 [dependencies]
-twitchchat = "0.8"
-regex = "1"
-lazy_static = "1"
+anyhow = "1"
 dotenv = "0.15"
-tokio = { version = "0.2", features = ["macros", "rt-threaded"] }
-env_logger = "0.7"
-log = "0.4"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.2"
+twitch-irc =  "3"

@@ -1,91 +1,62 @@
-#[macro_use]
-extern crate lazy_static;
-
-use dotenv::dotenv;
-use log::{debug, info, trace, warn};
-use regex::Regex;
-use std::collections::HashMap;
+use anyhow::Context;
 use std::env;
-use tokio::stream::StreamExt;
-use twitchchat::client::Status;
-use twitchchat::*;
+use std::time::Duration;
+use twitch_irc::login::StaticLoginCredentials;
+use twitch_irc::message::{PrivmsgMessage, ServerMessage};
+use twitch_irc::{ClientConfig, SecureTCPTransport, TwitchIRCClient};
 
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"^!(\S+)(?: (.+))?").unwrap();
-}
+type Client = TwitchIRCClient<SecureTCPTransport, StaticLoginCredentials>;
 
 #[tokio::main]
-async fn main() {
-    let _ = env_logger::init();
-    let (bot_username, oauth_token, channel_name) = get_env_vars();
-    let client = Client::new();
-    client
-        .writer()
-        .join(&channel_name)
-        .await
-        .expect("failed to join");
-    trace!("joined {}", channel_name);
+async fn main() -> anyhow::Result<()> {
+    dotenv::dotenv().ok();
+    tracing_subscriber::fmt().init();
 
-    {
-        let client = client.clone();
-        tokio::task::spawn(async move {
-            trace!("running handler");
-            let mut privmsgs = client.dispatcher().await.subscribe::<events::Privmsg>();
-            trace!("subscribed");
-            while let Some(msg) = privmsgs.next().await {
-                debug!("[{}] {}: {}", msg.channel, msg.name, msg.data);
-                process(&client, &*msg).await;
-            }
-        });
-    }
+    let bot_username =
+        env::var("BOT_USERNAME").context("missing BOT_USERNAME environment variable")?;
+    let oauth_token =
+        env::var("OAUTH_TOKEN").context("missing OAUTH_TOKEN environment variable")?;
+    let channel = env::var("CHANNEL_NAME").context("missing CHANNEL_NAME environment variable")?;
 
-    let (read, write) = twitchchat::connect_easy(&bot_username, &oauth_token, Secure::UseTls)
-        .await
-        .expect("failed to connect");
-    let rate_limit = rate_limit::RateLimit::full(20, std::time::Duration::from_secs(30));
-    match client
-        .run_with_user_rate_limit(read, write, rate_limit)
-        .await
-    {
-        Ok(Status::Eof) => println!("EOF"),
-        Ok(Status::Canceled) => println!("canceled"),
-        Err(err) => eprintln!("error!: {}", err),
-    };
-}
+    let config =
+        ClientConfig::new_simple(StaticLoginCredentials::new(bot_username, Some(oauth_token)));
+    let (mut incoming_messages, client) = Client::new(config);
 
-fn get_env_vars() -> (String, String, String) {
-    dotenv().ok();
-    let mut vars = env::vars().collect::<HashMap<String, String>>();
-    let bot_username = vars
-        .remove("BOT_USERNAME")
-        .expect("missing BOT_USERNAME environment variable");
-    let oauth_token = vars
-        .remove("OAUTH_TOKEN")
-        .expect("missing OAUTH_TOKEN environment variable");
-    let channel_name = vars
-        .remove("CHANNEL_NAME")
-        .expect("missing CHANNEL_NAME_VAR environment variable");
-    (bot_username, oauth_token, channel_name)
-}
-
-async fn process(client: &Client, msg: &messages::Privmsg<'_>) {
-    if let Some(caps) = RE.captures(&msg.data) {
-        let command = &caps[1];
-        let args = &caps
-            .get(2)
-            .map_or(vec![], |m| m.as_str().split_whitespace().collect());
-        info!("{}: {}({:?})", msg.name, command, args);
-        match (command, args.as_slice()) {
-            ("test", []) => {
-                client
-                    .writer()
-                    .privmsg(&msg.channel, "test")
-                    .await
-                    .expect("failed to send message");
-            }
-            _ => {
-                warn!("no command matched");
+    let clone = client.clone();
+    let join_handle = tokio::spawn(async move {
+        while let Some(message) = incoming_messages.recv().await {
+            if let ServerMessage::Privmsg(msg) = message {
+                handle_priv(clone.clone(), msg).await;
             }
         }
+    });
+
+    client.join(channel);
+
+    join_handle.await.unwrap();
+    Ok(())
+}
+
+async fn handle_priv(client: Client, msg: PrivmsgMessage) {
+    tracing::info!("Received message: {:#?}", msg);
+    if msg.message_text.starts_with("!hello") {
+        tokio::spawn(hello(client.clone(), msg));
     }
+}
+
+async fn hello(client: Client, msg: PrivmsgMessage) -> anyhow::Result<()> {
+    client
+        .say(
+            msg.channel_login.clone(),
+            format!("<( Hello, {}! )", &msg.sender.name),
+        )
+        .await?;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    client
+        .say(
+            msg.channel_login.clone(),
+            "<( How may I help you today? )".to_string(),
+        )
+        .await?;
+    Ok(())
 }
