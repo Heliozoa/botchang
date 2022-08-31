@@ -1,9 +1,10 @@
 use anyhow::Context;
-use std::env;
-use std::time::Duration;
-use twitch_irc::login::StaticLoginCredentials;
-use twitch_irc::message::{PrivmsgMessage, ServerMessage};
-use twitch_irc::{ClientConfig, SecureTCPTransport, TwitchIRCClient};
+use std::{env, time::Duration};
+use twitch_irc::{
+    login::StaticLoginCredentials,
+    message::{PrivmsgMessage, ServerMessage},
+    ClientConfig, SecureTCPTransport, TwitchIRCClient,
+};
 
 type Client = TwitchIRCClient<SecureTCPTransport, StaticLoginCredentials>;
 
@@ -31,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    client.join(channel);
+    client.join(channel).unwrap();
 
     join_handle.await.unwrap();
     Ok(())
@@ -40,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
 async fn handle_priv(client: Client, msg: PrivmsgMessage) {
     tracing::info!("Received message: {:#?}", msg);
     if msg.message_text.starts_with("!hello") {
-        tokio::spawn(hello(client.clone(), msg));
+        tokio::spawn(hello(client, msg));
     }
 }
 
