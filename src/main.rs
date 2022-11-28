@@ -1,9 +1,11 @@
+mod command;
+
+use crate::command::{Command, CommandName};
 use anyhow::Context;
 use std::{env, time::Duration};
 use twitch_irc::{
-    login::StaticLoginCredentials,
-    message::{PrivmsgMessage, ServerMessage},
-    ClientConfig, SecureTCPTransport, TwitchIRCClient,
+    login::StaticLoginCredentials, message::ServerMessage, ClientConfig, SecureTCPTransport,
+    TwitchIRCClient,
 };
 
 type Client = TwitchIRCClient<SecureTCPTransport, StaticLoginCredentials>;
@@ -22,40 +24,39 @@ async fn main() -> anyhow::Result<()> {
     let config =
         ClientConfig::new_simple(StaticLoginCredentials::new(bot_username, Some(oauth_token)));
     let (mut incoming_messages, client) = Client::new(config);
-
-    let clone = client.clone();
-    let join_handle = tokio::spawn(async move {
-        while let Some(message) = incoming_messages.recv().await {
-            if let ServerMessage::Privmsg(msg) = message {
-                handle_priv(clone.clone(), msg).await;
-            }
-        }
-    });
-
     client.join(channel).unwrap();
 
-    join_handle.await.unwrap();
+    while let Some(message) = incoming_messages.recv().await {
+        if let ServerMessage::Privmsg(msg) = message {
+            if let Some(cmd) = Command::parse(msg) {
+                tokio::task::spawn(handle_cmd(client.clone(), cmd));
+            }
+        }
+    }
     Ok(())
 }
 
-async fn handle_priv(client: Client, msg: PrivmsgMessage) {
-    tracing::info!("Received message: {:#?}", msg);
-    if msg.message_text.starts_with("!hello") {
-        tokio::spawn(hello(client, msg));
+async fn handle_cmd(client: Client, cmd: Command) {
+    tracing::info!("Received cmd: {:#?}", cmd);
+    let res = match cmd.command {
+        CommandName::Hello => hello(client, cmd).await,
+    };
+    if let Err(err) = res {
+        tracing::error!("{err}")
     }
 }
 
-async fn hello(client: Client, msg: PrivmsgMessage) -> anyhow::Result<()> {
+async fn hello(client: Client, cmd: Command) -> anyhow::Result<()> {
     client
         .say(
-            msg.channel_login.clone(),
-            format!("<( Hello, {}! )", &msg.sender.name),
+            cmd.msg.channel_login.clone(),
+            format!("<( Hello, {}! )", &cmd.msg.sender.name),
         )
         .await?;
     tokio::time::sleep(Duration::from_secs(2)).await;
     client
         .say(
-            msg.channel_login.clone(),
+            cmd.msg.channel_login.clone(),
             "<( How may I help you today? )".to_string(),
         )
         .await?;
