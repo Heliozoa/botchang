@@ -1,8 +1,9 @@
 mod command;
+mod commands;
 
-use crate::command::{Command, CommandName};
+use crate::command::Command;
 use anyhow::Context;
-use std::{env, time::Duration};
+use std::env;
 use twitch_irc::{
     login::StaticLoginCredentials, message::ServerMessage, ClientConfig, SecureTCPTransport,
     TwitchIRCClient,
@@ -29,36 +30,9 @@ async fn main() -> anyhow::Result<()> {
     while let Some(message) = incoming_messages.recv().await {
         if let ServerMessage::Privmsg(msg) = message {
             if let Some(cmd) = Command::parse(msg) {
-                tokio::task::spawn(handle_cmd(client.clone(), cmd));
+                tokio::task::spawn(commands::exec(client.clone(), cmd));
             }
         }
     }
-    Ok(())
-}
-
-async fn handle_cmd(client: Client, cmd: Command) {
-    tracing::info!("Received cmd: {:#?}", cmd);
-    let res = match cmd.command {
-        CommandName::Hello => hello(client, cmd).await,
-    };
-    if let Err(err) = res {
-        tracing::error!("{err}")
-    }
-}
-
-async fn hello(client: Client, cmd: Command) -> anyhow::Result<()> {
-    client
-        .say(
-            cmd.msg.channel_login.clone(),
-            format!("<( Hello, {}! )", &cmd.msg.sender.name),
-        )
-        .await?;
-    tokio::time::sleep(Duration::from_secs(2)).await;
-    client
-        .say(
-            cmd.msg.channel_login.clone(),
-            "<( How may I help you today? )".to_string(),
-        )
-        .await?;
     Ok(())
 }

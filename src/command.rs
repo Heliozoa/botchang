@@ -2,10 +2,8 @@ use twitch_irc::message::PrivmsgMessage;
 
 #[derive(Debug)]
 pub struct Command {
-    pub command_type: CommandType,
-    pub command: CommandName,
-    pub msg: PrivmsgMessage,
-    args_start: Option<usize>,
+    pub name: CommandName,
+    pub args: CommandArgs,
 }
 
 impl Command {
@@ -19,15 +17,41 @@ impl Command {
         } else {
             text
         };
-        let command = CommandName::parse(command)?;
-        Some(Command {
-            command_type,
-            command,
-            msg,
-            args_start,
+        let name = CommandName::parse(command)?;
+        Some(Self {
+            name,
+            args: CommandArgs {
+                command_type,
+                msg,
+                args_start,
+            },
         })
     }
+}
 
+#[derive(Debug)]
+pub enum CommandName {
+    Hello,
+}
+
+impl CommandName {
+    fn parse(s: &str) -> Option<Self> {
+        let cmd = match s {
+            "hello" => Self::Hello,
+            _ => return None,
+        };
+        Some(cmd)
+    }
+}
+
+#[derive(Debug)]
+pub struct CommandArgs {
+    pub command_type: CommandType,
+    pub msg: PrivmsgMessage,
+    args_start: Option<usize>,
+}
+
+impl CommandArgs {
     pub fn args(&self) -> &str {
         if let Some(args_start) = self.args_start {
             &self.msg.message_text[args_start..]
@@ -49,20 +73,5 @@ impl CommandType {
             _ => return None,
         };
         Some(ct)
-    }
-}
-
-#[derive(Debug)]
-pub enum CommandName {
-    Hello,
-}
-
-impl CommandName {
-    fn parse(s: &str) -> Option<Self> {
-        let cmd = match s {
-            "hello" => Self::Hello,
-            _ => return None,
-        };
-        Some(cmd)
     }
 }
