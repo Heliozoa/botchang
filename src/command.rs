@@ -9,13 +9,13 @@ pub struct Command {
 impl Command {
     pub fn parse(msg: PrivmsgMessage) -> Option<Self> {
         let text = msg.message_text.as_str();
-        let byte = text.bytes().next()?;
-        let command_type = CommandType::parse(byte)?;
-        let args_start = text.find(' ');
-        let command = if let Some(args_start) = args_start {
-            &text[1..args_start]
+        let command_type = CommandType::parse(text)?;
+
+        let cmd_and_args = text.get(1..)?;
+        let (command, args_start) = if let Some(space) = cmd_and_args.find(' ') {
+            (&cmd_and_args[..space], Some(space + 1))
         } else {
-            text
+            (cmd_and_args, None)
         };
         let name = CommandName::parse(command)?;
         Some(Self {
@@ -23,7 +23,7 @@ impl Command {
             args: CommandArgs {
                 command_type,
                 msg,
-                args_start,
+                args_start: args_start.map(|s| s + 1),
             },
         })
     }
@@ -32,12 +32,14 @@ impl Command {
 #[derive(Debug)]
 pub enum CommandName {
     Hello,
+    Echo,
 }
 
 impl CommandName {
     fn parse(s: &str) -> Option<Self> {
         let cmd = match s {
             "hello" => Self::Hello,
+            "echo" => Self::Echo,
             _ => return None,
         };
         Some(cmd)
@@ -53,11 +55,9 @@ pub struct CommandArgs {
 
 impl CommandArgs {
     pub fn args(&self) -> &str {
-        if let Some(args_start) = self.args_start {
-            &self.msg.message_text[args_start..]
-        } else {
-            ""
-        }
+        self.args_start
+            .and_then(|a| self.msg.message_text.get(a..))
+            .unwrap_or_default()
     }
 }
 
@@ -67,8 +67,8 @@ pub enum CommandType {
 }
 
 impl CommandType {
-    fn parse(s: u8) -> Option<Self> {
-        let ct = match s {
+    fn parse(s: &str) -> Option<Self> {
+        let ct = match s.bytes().next()? {
             b'!' => Self::Run,
             _ => return None,
         };
